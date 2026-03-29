@@ -4,8 +4,12 @@
 
 **a. Initial design**
 
-- Briefly describe your initial UML design.
+- Briefly describe your initial UML design. 
 - What classes did you include, and what responsibilities did you assign to each?
+
+My initial UML design includes 4 classes, Owner, Pet, Task and Scheduler. The Owner class includes the owner id and owner name and a list of pets as a list of Pet objects.It also include a list of task which are all the tasks need to be done for the owners'pets ordered by priority level. The Owner can add/remove a pet and add/remove a task and change the order of the task. The Pet Class includes the pet id and the pet name as well as the Owner object. It also includes a routine dictionary which contains the tasks need to be done for this pet and the freqency of the task. The Pet class can also change the task. The Scheduler class will include a list of scheduled tasks in their priority order. It can add/remove a task. It can also change the priority level of a task.
+
+3 core actions the user should be able to perform include adding a pet, scheduling a walk/groom, list a daily plan.
 
 **b. Design changes**
 
