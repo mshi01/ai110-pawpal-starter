@@ -4,6 +4,17 @@ from pawpal_system import Owner, Pet, Task, Scheduler
 
 st.set_page_config(page_title="PawPal+", page_icon="🐾", layout="centered")
 
+# ── UI helpers ────────────────────────────────────────────────────────────────
+SPECIES_EMOJI   = {"dog": "🐶", "cat": "🐱", "other": "🐾"}
+PRIORITY_EMOJI  = {"high": "🔴", "medium": "🟡", "low": "🟢"}
+FREQUENCY_EMOJI = {"daily": "🔁", "weekly": "📅", "once": "1️⃣"}
+PRIORITY_COLOR  = {"high": "#ffd6d6", "medium": "#fff3cd", "low": "#d4edda"}
+STATUS_BADGE    = {
+    "pending":   '<span style="background:#fff3cd;color:#856404;padding:2px 8px;border-radius:10px;font-size:12px;">⏳ pending</span>',
+    "completed": '<span style="background:#d4edda;color:#155724;padding:2px 8px;border-radius:10px;font-size:12px;">✅ completed</span>',
+    "skipped":   '<span style="background:#e2e3e5;color:#383d41;padding:2px 8px;border-radius:10px;font-size:12px;">⏭ skipped</span>',
+}
+
 st.title("🐾 PawPal+")
 
 # ── Session-state "vault" ────────────────────────────────────────────────────
@@ -45,6 +56,7 @@ with st.expander("Owner & Pet settings"):
     st.markdown("**Your pets**")
 
     for i, pet in enumerate(list(owner.pets)):
+        st.caption(f"{SPECIES_EMOJI.get(pet.species, '🐾')} {pet.name} ({pet.species})")
         col_p, col_s, col_upd, col_del = st.columns([2, 2, 1, 1])
         with col_p:
             new_pet_name = st.text_input("Name", value=pet.name, key=f"pet_name_{i}")
@@ -105,58 +117,109 @@ st.caption(f"Tasks are attached to **{active_pet.name}** and persist across reru
 
 col1, col2, col3, col4 = st.columns(4)
 with col1:
-    task_title = st.text_input("Task title", value="Morning walk")
-with col2:
     task_desc = st.text_input("Description", value="")
+with col2:
+    task_time = st.time_input("Scheduled time", value=time(8, 0))
 with col3:
-    duration = st.number_input("Duration (min)", min_value=1, max_value=240, value=20)
+    frequency = st.selectbox("Frequency", ["daily", "weekly", "once"])
 with col4:
     priority = st.selectbox("Priority", ["low", "medium", "high"], index=2)
 
 if st.button("Add task"):
-    new_task = Task(
-        title=task_title,
-        description=task_desc,
-        duration_minutes=int(duration),
-        priority=priority,
-    )
-    active_pet.add_task(new_task)
-    st.success(f"Added task '{task_title}' to {active_pet.name}.")
+    if not task_desc.strip():
+        st.error("Please enter a task description.")
+    else:
+        scheduled_dt = datetime.combine(datetime.today().date(), task_time)
+        new_task = Task(
+            description=task_desc.strip(),
+            time=scheduled_dt,
+            frequency=frequency,
+            priority=priority,
+        )
+        active_pet.add_task(new_task)
+        st.success(f"Added task '{task_desc.strip()}' to {active_pet.name}.")
 
 if active_pet.tasks:
-    st.write(f"Current tasks for **{active_pet.name}**:")
+    species_icon = SPECIES_EMOJI.get(active_pet.species, "🐾")
+    st.write(f"Tasks for {species_icon} **{active_pet.name}**:")
     for i, task in enumerate(active_pet.tasks):
-        col_info, col_btn = st.columns([5, 1])
+        col_info, col_complete, col_remove = st.columns([5, 1, 1])
         with col_info:
+            time_str = task.time.strftime("%H:%M") if task.time else "No time set"
+            priority_icon = PRIORITY_EMOJI.get(task.priority, "")
+            freq_icon = FREQUENCY_EMOJI.get(task.frequency, "")
+            status_badge = STATUS_BADGE.get(task.status, task.status)
             st.markdown(
-                f"**{task.title}** · {task.priority} priority · "
-                f"{task.duration_minutes} min · *{task.status}*"
+                f"{priority_icon} **{task.description}** &nbsp; {freq_icon} {task.frequency} &nbsp;"
+                f"🕐 {time_str} &nbsp; {status_badge}",
+                unsafe_allow_html=True,
             )
-        with col_btn:
-            if st.button("Remove", key=f"remove_task_{i}"):
+        with col_complete:
+            if task.status != "completed":
+                if st.button("✔ Complete", key=f"complete_task_{i}", use_container_width=True):
+                    scheduler = Scheduler(owner)
+                    scheduler.mark_task_complete(active_pet, task)
+                    st.rerun()
+            else:
+                st.markdown("✅ Done")
+        with col_remove:
+            if st.button("🗑 Remove", key=f"remove_task_{i}", use_container_width=True):
                 active_pet.remove_task(task)
                 st.rerun()
 else:
     st.info("No tasks yet. Add one above.")
-
-if active_pet.tasks:
-    if st.button("Reset daily tasks", key="reset_daily"):
-        for task in active_pet.tasks:
-            if task.frequency == "daily":
-                task.reset()
-        st.success("Daily tasks reset to pending.")
-        st.rerun()
 
 st.divider()
 
 # ── Schedule generation ──────────────────────────────────────────────────────
 st.subheader("Build Schedule")
 
-col_start, col_end = st.columns(2)
-with col_start:
-    day_start_time = st.time_input("Day start", value=time(8, 0))
-with col_end:
-    day_end_time = st.time_input("Day end", value=time(20, 0))
+def render_schedule(schedule, scheduler):
+    rows_html = ""
+    for pet, task in schedule:
+        bg = PRIORITY_COLOR.get(task.priority, "#ffffff")
+        time_str = task.time.strftime("%H:%M") if task.time else "No time set"
+        priority_icon = PRIORITY_EMOJI.get(task.priority, "")
+        freq_icon = FREQUENCY_EMOJI.get(task.frequency, "")
+        species_icon = SPECIES_EMOJI.get(pet.species, "🐾")
+        status_badge = STATUS_BADGE.get(task.status, task.status)
+        td = 'style="padding:8px 10px;"'
+        rows_html += (
+            f'<tr style="background-color:{bg}; border-bottom:1px solid #ddd;">'
+            f"<td {td}>{species_icon} {pet.name}</td>"
+            f"<td {td}>{task.description}</td>"
+            f"<td {td}>{priority_icon} {task.priority.capitalize()}</td>"
+            f"<td {td}>🕐 {time_str}</td>"
+            f"<td {td}>{freq_icon} {task.frequency}</td>"
+            f"<td {td}>{status_badge}</td>"
+            f"</tr>"
+        )
+    th = 'style="padding:8px 10px; background:#f0f2f6; text-align:left;"'
+    st.markdown(
+        f"""
+        <table style="width:100%; border-collapse:collapse; font-size:14px; border:1px solid #ddd; border-radius:8px; overflow:hidden;">
+          <thead>
+            <tr>
+              <th {th}>Pet</th>
+              <th {th}>Description</th>
+              <th {th}>Priority</th>
+              <th {th}>Time</th>
+              <th {th}>Frequency</th>
+              <th {th}>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows_html}
+          </tbody>
+        </table>
+        """,
+        unsafe_allow_html=True,
+    )
+    conflicts = scheduler.detect_conflicts(schedule)
+    if conflicts:
+        st.markdown("**⚠️ Conflicts detected:**")
+        for warning in conflicts:
+            st.warning(warning)
 
 if st.button("Generate schedule"):
     has_pending = any(
@@ -167,44 +230,17 @@ if st.button("Generate schedule"):
     if not has_pending:
         st.warning("Add at least one pet and one pending task first.")
     else:
-        today = datetime.today().date()
-        day_start = datetime.combine(today, day_start_time)
-        day_end = datetime.combine(today, day_end_time)
-
-        available_minutes = (day_end - day_start).total_seconds() / 60
-        from pawpal_system import BREAK_MINUTES
-        pending_pairs = Scheduler(owner).get_pending_tasks()
-        total_needed = sum(t.duration_minutes for _, t in pending_pairs)
-        if total_needed > available_minutes:
-            st.warning(
-                f"Tasks total {total_needed} min but only {int(available_minutes)} min available — "
-                "some tasks will be excluded."
-            )
-
         scheduler = Scheduler(owner)
-        schedule, skipped = scheduler.build_schedule(day_start, day_end)
-
+        schedule = scheduler.build_schedule()
         if schedule:
-            st.success(f"Schedule built — {len(schedule)} task(s) fit in the day.")
-            st.table(
-                [
-                    {
-                        "pet": entry["pet"],
-                        "task": entry["task"],
-                        "priority": entry["priority"],
-                        "start": entry["start"].strftime("%H:%M"),
-                        "end": entry["end"].strftime("%H:%M"),
-                        "duration (min)": int(
-                            (entry["end"] - entry["start"]).total_seconds() / 60
-                        ),
-                    }
-                    for entry in schedule
-                ]
-            )
+            st.session_state["schedule"] = schedule
+            st.session_state["scheduler"] = scheduler
         else:
-            st.warning("No tasks fit in the selected time window.")
+            st.info("No pending tasks for today.")
 
-        if skipped:
-            st.markdown("**Tasks excluded from schedule:**")
-            for pet_name, task_title, reason in skipped:
-                st.caption(f"- {pet_name} / {task_title}: {reason}")
+if "schedule" in st.session_state:
+    schedule = st.session_state["schedule"]
+    scheduler = st.session_state["scheduler"]
+    completed = sum(1 for _, t in schedule if t.status == "completed")
+    st.success(f"🗓 Schedule — {len(schedule)} task(s) · {completed} completed")
+    render_schedule(schedule, scheduler)
