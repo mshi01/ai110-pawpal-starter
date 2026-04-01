@@ -16,7 +16,7 @@ The system was designed as a UML class diagram using Mermaid.js, implemented in 
 
 - **Priority-first scheduling** — `build_schedule()` sorts today's pending tasks by priority (high → medium → low), then by scheduled time within each priority tier. Tasks with no time set are placed at the end.
 - **Sorting by time** — `sort_by_time()` returns all tasks across every pet ordered by clock time, earliest first, with unscheduled tasks appended at the end.
-- **Conflict warnings** — `detect_conflicts()` performs a pairwise scan of the schedule and emits a human-readable warning for every pair of tasks whose scheduled times are identical. Displayed inline in the UI as ⚠️ alerts.
+- **Conflict warnings** — `detect_conflicts()` performs a pairwise scan of the schedule and emits a human-readable warning for every pair of tasks whose scheduled times are identical. Displayed inline in the UI as alerts.
 - **Daily recurrence** — when a `daily` task is marked complete, `mark_task_complete()` automatically creates a new pending copy of that task scheduled for the next day (`timedelta(days=1)`).
 - **Weekly recurrence** — same mechanism for `weekly` tasks; the next occurrence is set to `timedelta(days=7)` from today.
 - **Filtering by status** — `filter_by_status()` returns only the (pet, task) pairs whose status matches a given value (`"pending"`, `"completed"`, or `"skipped"`).
