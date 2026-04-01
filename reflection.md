@@ -7,21 +7,32 @@
 - Briefly describe your initial UML design. 
 - What classes did you include, and what responsibilities did you assign to each?
 
-My initial UML design includes 4 classes, Owner, Pet, Task and Scheduler. The Owner class includes the owner name and a list of Pet objects. It also includes a function add_pet which can add a pet and a function all_tasks which can list all (pet, task) pairs across all the pets for the owner. The Pet Class includes the pet name, species and a list of tasks. It also has a function add_task to add tasks to the pet. The Task class includes the attributes title and duration_minutes and a priority level and a function rank which can return the rank of the priority of the task as an integer level. The Scheduler class includes the Owner object and a build_schedule function which can create a schedule for the owner with task title and assigned schedule slots, the tasks are sorted by the priority level.
+The system is built around 4 classes: Owner, Pet, Task, and Scheduler.
 
-3 core actions the user should be able to perform include adding a pet, scheduling a walk/groom, list a daily plan.
+- Owner stores the owner's name and a list of Pet objects, with methods to add a pet (add_pet) and retrieve all (pet, task) pairs across every pet (all_tasks).
+- Pet stores the pet's name, species, and a list of Task objects, with an add_task method to attach tasks to the pet.
+- Task stores a title, duration in minutes, and a priority level, with a rank method that returns the priority as an integer for sorting.
+- Scheduler holds an Owner object and a build_schedule method that generates a daily schedule by sorting tasks by priority rank and assigning them to time slots.
+
+Core User Actions
+There are 3 key actions a user can perform:
+
+- Add a pet — register a new pet under the owner's profile.
+- Schedule a task — create and assign a task to a specific pet.
+- View the daily plan — generate and display a prioritized schedule of tasks across all pets.
 
 **b. Design changes**
 
 - Did your design change during implementation?
 - If yes, describe at least one change and why you made it.
 
-AI helped me to identify the following missing ralationships in the original UML diagram: Task has no back-reference to its Pet	If you pass a Task around on its own, you can't tell which pet it belongs to; Pet has no back-reference to its Owner; Scheduler is not in the UML as owning Owner, Owner has no reference to its Scheduler.
+Through AI-assisted review, several missing relationships in the original UML diagram were identified:
 
-AI also helped me to idenfify several logic bottlenecks. One of them is using "break" vs "continue" in build_schedule function. Using break stops at the first task that doesn't fit. If a 60-min low-priority task can't fit but a 5-min low-priority task after it could, it gets dropped silently. continue would be more correct. The other one is tasks: list is untyped (line 22)
-list instead of list[Task] means nothing prevents adding non-Task objects to Pet.tasks, which would silently break Scheduler.build_schedule when it calls .rank. Another drawback we found out is there is no guard for an empty schedule window
-If day_start >= day_end, build_schedule returns [] with no indication of why — could be confusing when wired to the UI.
+- Task has no back-reference to its parent Pet, making it impossible to determine which pet a task belongs to when the task is passed around in isolation.
+- Pet has no back-reference to its parent Owner.
+- Scheduler is not modeled as owning an Owner, and conversely, Owner holds no reference to its Scheduler.
 
+Several logic bottlenecks were also surfaced. For example, the handling of recurring tasks — specifically how mark_task_complete was implemented — did not account for auto-recreating tasks after completion. Also, using an untyped list instead of list[Task] for Pet.tasks places no restriction on what gets added, meaning non-Task objects could silently enter the list and cause Scheduler.build_schedule to break when it attempts to call .rank on them.
 
 
 ---
@@ -32,13 +43,13 @@ If day_start >= day_end, build_schedule returns [] with no indication of why —
 
 - What constraints does your scheduler consider (for example: time, priority, preferences)?
 - How did you decide which constraints mattered most?
-Priority is the first constraints the scheduler considers, tasks with high priority will be picked up first. Time is also another important constraints. If the tasks of the same priority one is too long in duration, the another one with shorter time duration will be picked. Taks that dont fit are collected in a skipped list and not just silently dropped. Also, a break of 5 minutes were added between tasks to allow more feasible execution of the tasks.
+The scheduler orders tasks based on two constraints. Priority is considered first — high-priority tasks are always scheduled before lower-priority ones. Time is the second constraint, used as a tiebreaker when tasks share the same priority level; among those, tasks are ordered chronologically by their scheduled start time. And if two tasks have conflicting start times, the scheduler surfaces a warning to the user.
 
 **b. Tradeoffs**
 
 - Describe one tradeoff your scheduler makes.
 - Why is that tradeoff reasonable for this scenario?
-One tradeoff the scheduler makes is to group by pet not just priority. In theory, we need to prioritize tasks of higher priority. However, this might lead to frequent switching of the pets to be taken care of for the owner which might not be very practical and frequent swtiching of pets to perform task might take more time for the owner to take care on the pet. so in reality I think it would be more reasonable to group tasks also by pet, not jusst the priority level. 
+One tradeoff in the scheduler's conflict detection is that it only checks for exact start time matches rather than overlapping durations. A duration-based approach would require each Task to carry an estimated completion time — which is inherently imprecise, since actual task durations can vary. By limiting conflict detection to exact time matches, the algorithm stays simple and the code remains easy to read and maintain.
 
 ---
 
@@ -48,13 +59,17 @@ One tradeoff the scheduler makes is to group by pet not just priority. In theory
 
 - How did you use AI tools during this project (for example: design brainstorming, debugging, refactoring)?
 - What kinds of prompts or questions were most helpful?
+AI was used throughout the development process for brainstorming, UML class design, debugging, refactoring, writing docstrings, and generating test cases. The most effective prompting strategy was asking specific, targeted questions with direct references to relevant files or line numbers.
+
 
 **b. Judgment and verification**
 
 - Describe one moment where you did not accept an AI suggestion as-is.
 - How did you evaluate or verify what the AI suggested?
-In the original design in app.py, AI suggeted to create a dufault owner named "Jordan" if the owner is not in session_state. I think instead of generating a default owner if would be better to create a form to collect owner info. 
-I read through what the AI suggested and think about it whether it makes sense or not and accept the changes only if it makes seneses. 
+Not all AI suggestions were accepted as-is — each was evaluated for whether it aligned with the intended design. Two examples illustrate this.
+First, when initializing app.py, AI suggested creating a default owner named "Jordan" if no owner was found in session state. This was reconsidered in favor of a setup form that explicitly collects owner information from the user, which is a more appropriate approach for a real application.
+Second, AI initially misunderstood the purpose of the Scheduler, designing it to accept start and end times as inputs and align tasks based on durations. After clarifying the intended behavior, AI revised the implementation to match what was actually needed.
+A general lesson from this process is that AI can sometimes over-engineer solutions beyond what is necessary. Reviewing suggestions incrementally — rather than accepting large changes all at once — helps catch these cases early before they compound into larger issues.
 
 ---
 
@@ -64,12 +79,17 @@ I read through what the AI suggested and think about it whether it makes sense o
 
 - What behaviors did you test?
 - Why were these tests important?
-Test if sort_by_time works correctly. unscheduled tasks - none ones musht appear at the end. Deal with Two tasks with identical scheduled_time.
+Three areas of core functionality were tested to verify the app behaves as intended.
+First, task sorting was validated to confirm that tasks are ordered by priority (highest first) and then chronologically by scheduled time when priorities are equal.
+Second, the recurrence logic was tested by verifying that marking a daily task complete via mark_task_complete() automatically creates a new pending copy of that task scheduled for the following day, while a once task produces no follow-up after completion.
+Third, conflict detection was tested to confirm that detect_conflicts() emits a warning for every pair of tasks sharing an identical scheduled time, and returns an empty list when all times are distinct or when tasks have no scheduled time set.
+These tests are important because they directly cover the app's core scheduling behavior.
 
 **b. Confidence**
 
 - How confident are you that your scheduler works correctly?
 - What edge cases would you test next if you had more time?
+The scheduler works as intended, earning a confidence rating of 4 out of 5. Given more time, one area worth exploring further is handling tasks with overlapping durations — both designing the logic for how the scheduler should deal with this scenario and adding tests to cover it.
 
 ---
 
@@ -78,20 +98,16 @@ Test if sort_by_time works correctly. unscheduled tasks - none ones musht appear
 **a. What went well**
 
 - What part of this project are you most satisfied with?
-This app implemented Smarter Scheduling. It can detect conflict. Takes the output of build_schedule and checks every pair of tasks for overlapping time windows using the interval overlap condition:
+The app implements smarter scheduling by sorting tasks by priority and time, detecting scheduling conflicts, and automatically re-queuing recurring tasks after completion — all through a clean, user-friendly interface.
 
-
-a.start < b.end  AND  b.start < a.end
-Returns a list of human-readable warning strings instead of crashing. Works across pets and same-pet tasks alike. Also it performs auto-rescheduling on completion. When a recurring task is marked done, a new pending instance is automatically created for the next occurrence. It also implemented optimized time sorting. Replaced a two-pass split-and-concatenate approach with a single-pass sorted using a sentinel tuple key:
-
-
-key=lambda t: (t.scheduled_time is None, t.scheduled_time)
-Timed tasks sort first (False < True), unscheduled tasks fall to the end — no None comparison errors, no extra list allocations.
 
 **b. What you would improve**
 
 - If you had another iteration, what would you improve or redesign?
+A natural next step would be adding a duration attribute to each Task and incorporating estimated durations into the scheduling logic. This would also open the door to inserting buffer time between back-to-back tasks, making the generated schedule more realistic and practical.
+
 
 **c. Key takeaway**
 
 - What is one important thing you learned about designing systems or working with AI on this project?
+Starting with a minimal design and incrementally adding complexity leads to more manageable development. When working with AI, it is important to fully read and understand each suggestion before accepting it, and to verify that it aligns with the intended behavior rather than introducing unnecessary complexity.

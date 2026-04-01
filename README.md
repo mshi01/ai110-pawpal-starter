@@ -49,6 +49,8 @@ The tests cover three core scheduling behaviors:
 | **Recurrence logic** | Marking a `daily` task complete via `mark_task_complete()` automatically adds a new `pending` copy of that task scheduled for the following day. One-off (`once`) tasks produce no follow-up. |
 | **Conflict detection** | `detect_conflicts()` emits a warning for every pair of tasks sharing an identical scheduled time; returns an empty list when all times differ or when tasks have no time set. |
 
+Confidence level on system reliablility: 4 stars
+
 ## Getting started
 
 ### Setup
@@ -76,3 +78,9 @@ Streamlit will open the app automatically in your browser at `http://localhost:8
 5. Add tests to verify key behaviors.
 6. Connect your logic to the Streamlit UI in `app.py`.
 7. Refine UML so it matches what you actually built.
+
+### 📸 Demo
+![screen shot 1](screenshot1.png)
+![screen shot 2](screenshot2.png)
+![screen shot 3](screenshot3.png)
+![screen shot 4](screenshot4.png)
