@@ -156,14 +156,15 @@ if active_pet.tasks:
             )
         with col_complete:
             if task.status != "completed":
-                if st.button("✔ Complete", key=f"complete_task_{i}", use_container_width=True):
+                if st.button("Done", key=f"complete_task_{i}", use_container_width=True):
                     scheduler = Scheduler(owner)
                     scheduler.mark_task_complete(active_pet, task)
                     st.rerun()
+                    # ✔ 
             else:
                 st.markdown("✅ Done")
-        with col_remove:
-            if st.button("🗑 Remove", key=f"remove_task_{i}", use_container_width=True):
+        with col_remove: # 🗑
+            if st.button("Remove", key=f"remove_task_{i}", use_container_width=True):
                 active_pet.remove_task(task)
                 st.rerun()
 else:
